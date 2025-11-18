@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b1021;
+}
+
+body {
+  background-color: #0b1021;
+  color: #f9fafb;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.card {
+  @apply bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur;
+}
+
+.grid-cols-dashboard {
+  grid-template-columns: 320px 1fr;
+}
+
+.text-muted {
+  @apply text-gray-400;
+}
+
+.text-subtle {
+  @apply text-gray-500;
+}
+
+.section-title {
+  @apply text-xs uppercase tracking-widest text-gray-400 font-semibold;
+}
