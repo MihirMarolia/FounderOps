@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  name          String?
+  avatar_url    String?
+  role          Role      @default(USER)
+  ideas         Idea[]    @relation("SubmittedIdeas")
+  approvedIdeas Idea[]    @relation("ApprovedIdeas")
+  votes         Vote[]
+  comments      Comment[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Idea {
+  id              String        @id @default(uuid())
+  title           String
+  slug            String        @unique
+  tagline         String
+  description     String        @db.Text
+  status          IdeaStatus    @default(PENDING)
+  category        Category
+  marketType      MarketType
+  targetAudience  String?
+  mainCompetitor  String?
+  pricingModel    String?
+  submittedById   String
+  submittedBy     User          @relation("SubmittedIdeas", fields: [submittedById], references: [id])
+  approvedById    String?
+  approvedBy      User?         @relation("ApprovedIdeas", fields: [approvedById], references: [id])
+  featuredDate    DateTime?
+  viewCount       Int           @default(0)
+  upvoteCount     Int           @default(0)
+  analysis        IdeaAnalysis?
+  trends          TrendData[]
+  resources       BuildResource[]
+  votes           Vote[]
+  comments        Comment[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([slug])
+}
+
+model IdeaAnalysis {
+  id             String   @id @default(uuid())
+  ideaId         String   @unique
+  idea           Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  whyNow         Json
+  proofSignals   Json
+  marketGap      Json
+  executionPlan  Json
+  frameworkFit   Json?
+  generatedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model TrendData {
+  id           String    @id @default(uuid())
+  ideaId       String
+  idea         Idea      @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  platform     Platform
+  metricName   String
+  metricValue  String
+  score        Int       // 1-10
+  details      Json?
+  collectedAt  DateTime  @default(now())
+}
+
+model BuildResource {
+  id           String       @id @default(uuid())
+  ideaId       String
+  idea         Idea         @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  resourceType ResourceType
+  aiTool       AiTool
+  content      String       @db.Text
+  promptUsed   String?      @db.Text
+  createdAt    DateTime     @default(now())
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  voteType  VoteType
+  createdAt DateTime @default(now())
+
+  @@unique([userId, ideaId])
+  @@index([userId, ideaId])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  content   String    @db.Text
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ideaId    String
+  idea      Idea      @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum IdeaStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  FEATURED
+}
+
+enum Category {
+  SAAS
+  ECOMMERCE
+  MARKETPLACE
+  TOOL
+  SERVICE
+  OTHER
+}
+
+enum MarketType {
+  B2B
+  B2C
+  B2B2C
+}
+
+enum Platform {
+  REDDIT
+  FACEBOOK
+  YOUTUBE
+  TWITTER
+  OTHER
+}
+
+enum ResourceType {
+  AD_CREATIVE
+  BRAND_PACKAGE
+  LANDING_PAGE
+  PITCH_DECK
+}
+
+enum AiTool {
+  CLAUDE
+  CHATGPT
+  V0
+  LOVABLE
+}
+
+enum VoteType {
+  UPVOTE
+  DOWNVOTE
+}
