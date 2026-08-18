@@ -43,6 +43,41 @@ const initialStages: Stage[] = [
   { id: 8, name: 'Operating cadence', eyebrow: 'Keep moving', status: 'upcoming', description: 'Turn learning into a weekly rhythm of focus, evidence, and decisions.', prompt: 'What is the one outcome that would make this week meaningfully successful?', helper: 'FounderOps keeps you focused on one key metric, a short list of actions, and a weekly pivot-or-persevere decision.', placeholder: 'Define this week’s outcome, metric, customer conversations, and build block...', artifact: 'Weekly operating plan', evidence: 'Cadence not started' }
 ];
 
+type SelectionStep = 'industry' | 'segment' | 'audience';
+
+const selectionOptions: Record<SelectionStep, Array<{ id: string; label: string; description: string; icon: string }>> = {
+  industry: [
+    { id: 'health', label: 'Health & wellness', description: 'Care delivery, clinics, fitness, mental health, and wellbeing.', icon: '✦' },
+    { id: 'software', label: 'Software & AI', description: 'Tools, platforms, automation, and intelligent products.', icon: '◎' },
+    { id: 'finance', label: 'Finance & commerce', description: 'Payments, banking, insurance, marketplaces, and money movement.', icon: '◌' },
+    { id: 'climate', label: 'Climate & industry', description: 'Energy, infrastructure, manufacturing, and the built world.', icon: '⌁' },
+    { id: 'education', label: 'Education & work', description: 'Learning, careers, teams, and professional development.', icon: '▱' },
+    { id: 'consumer', label: 'Consumer & lifestyle', description: 'Products and services for everyday life, culture, and communities.', icon: '○' }
+  ],
+  segment: [
+    { id: 'independent', label: 'Independent businesses', description: 'Owner-led organizations with a focused local or niche market.', icon: '◫' },
+    { id: 'midmarket', label: 'Growing mid-market teams', description: 'Established teams looking to improve operations and outcomes.', icon: '▥' },
+    { id: 'enterprise', label: 'Enterprise organizations', description: 'Large organizations with complex buying and implementation cycles.', icon: '▦' },
+    { id: 'public', label: 'Public sector & communities', description: 'Government, civic organizations, and community-led institutions.', icon: '⌘' },
+    { id: 'creators', label: 'Creators & individuals', description: 'People building independent practices, audiences, or businesses.', icon: '✧' },
+    { id: 'developers', label: 'Developers & technical teams', description: 'Technical builders who adopt infrastructure, APIs, or developer tools.', icon: '⌘' }
+  ],
+  audience: [
+    { id: 'owners', label: 'Owners & operators', description: 'People responsible for running the business day to day.', icon: '◉' },
+    { id: 'leaders', label: 'Functional leaders', description: 'Heads of growth, sales, finance, operations, or product.', icon: '◍' },
+    { id: 'practitioners', label: 'Practitioners', description: 'People doing the hands-on work and living with the workflow.', icon: '◈' },
+    { id: 'buyers', label: 'Professional buyers', description: 'Procurement, IT, finance, or other formal buying roles.', icon: '◇' },
+    { id: 'members', label: 'Members & consumers', description: 'End users who choose, use, and experience the product directly.', icon: '◌' },
+    { id: 'communities', label: 'Communities & partners', description: 'Groups, networks, and organizations that influence adoption.', icon: '⊙' }
+  ]
+};
+
+const selectionMeta: Record<SelectionStep, { title: string; description: string; next: SelectionStep | null }> = {
+  industry: { title: 'What world are you building in?', description: 'Start broad. FounderOps will use this to shape market examples, risks, and the language of your build path.', next: 'segment' },
+  segment: { title: 'Which part of that world is your beachhead?', description: 'Choose the type of organization or market segment where your first wedge is most likely to get traction.', next: 'audience' },
+  audience: { title: 'Who will feel the value first?', description: 'Pick the role or group whose problem is urgent, reachable, and specific enough to interview this week.', next: null }
+};
+
 const navItems = [
   { label: 'Today', icon: BoltIcon },
   { label: 'Build path', icon: FlagIcon },
@@ -57,6 +92,8 @@ export default function FounderOpsWorkspace() {
   const [answer, setAnswer] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [showContext, setShowContext] = useState(false);
+  const [selectionStep, setSelectionStep] = useState<SelectionStep>('industry');
+  const [selectionValues, setSelectionValues] = useState<Record<SelectionStep, string>>({ industry: '', segment: '', audience: '' });
   const [canUseSpeech, setCanUseSpeech] = useState(false);
   const [context, setContext] = useState({ industry: 'Health & wellness', segment: 'Independent clinics', audience: 'Clinic owners', location: 'Ontario, Canada', model: 'B2B SaaS', hours: '8 hours / week' });
 
@@ -95,6 +132,30 @@ export default function FounderOpsWorkspace() {
     }
   }
 
+  function openContextFlow() {
+    const step: SelectionStep = !selectionValues.industry ? 'industry' : !selectionValues.segment ? 'segment' : !selectionValues.audience ? 'audience' : 'industry';
+    setSelectionStep(step);
+    setShowContext(true);
+  }
+
+  function chooseSelection(step: SelectionStep, value: string) {
+    const label = selectionOptions[step].find((option) => option.id === value)?.label ?? value;
+    setSelectionValues((current) => ({ ...current, [step]: value }));
+    setContext((current) => ({ ...current, [step]: label }));
+  }
+
+  function continueSelection() {
+    const selected = selectionValues[selectionStep];
+    if (!selected) return;
+    const next = selectionMeta[selectionStep].next;
+    if (next) {
+      setSelectionStep(next);
+    } else {
+      setShowContext(false);
+      setActiveStageId(2);
+    }
+  }
+
   function startListening() {
     if (!canUseSpeech) return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -124,10 +185,10 @@ export default function FounderOpsWorkspace() {
         </aside>
 
         <section className="min-w-0 flex-1">
-          <header className="flex h-[74px] items-center justify-between border-b border-white/[0.07] px-5 sm:px-8"><div className="flex items-center gap-3"><button className="icon-button lg:hidden"><Bars3Icon className="h-5 w-5" /></button><div><p className="text-xs font-medium text-slate-500">Workspace / {activeNav}</p><h1 className="text-base font-semibold tracking-tight">MediFlow — from insight to first customers</h1></div></div><div className="flex items-center gap-3"><button onClick={() => setShowContext(true)} className="context-pill"><span className="status-pulse" />{context.industry}<span className="hidden text-slate-500 sm:inline">·</span><span className="hidden sm:inline">{context.location}</span><PencilSquareIcon className="h-3.5 w-3.5 text-slate-500" /></button><div className="avatar">AM</div></div></header>
+          <header className="flex h-[74px] items-center justify-between border-b border-white/[0.07] px-5 sm:px-8"><div className="flex items-center gap-3"><button className="icon-button lg:hidden"><Bars3Icon className="h-5 w-5" /></button><div><p className="text-xs font-medium text-slate-500">Workspace / {activeNav}</p><h1 className="text-base font-semibold tracking-tight">MediFlow — from insight to first customers</h1></div></div><div className="flex items-center gap-3"><button onClick={openContextFlow} className="context-pill"><span className="status-pulse" />{context.industry}<span className="hidden text-slate-500 sm:inline">·</span><span className="hidden sm:inline">{context.location}</span><PencilSquareIcon className="h-3.5 w-3.5 text-slate-500" /></button><div className="avatar">AM</div></div></header>
 
           <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-8">
-            <div className="mb-8 flex flex-col justify-between gap-5 xl:flex-row xl:items-end"><div><p className="eyebrow">{activeStage.eyebrow} · Stage {activeStage.id} of {stages.length}</p><h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">Build the company, one <span className="text-indigo-300">validated step</span> at a time.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">FounderOps turns your choices and conversations into a practical path from idea to evidence. No generic business plan. Just the next thing worth learning.</p></div><button onClick={() => setShowContext(true)} className="secondary-button shrink-0"><PencilSquareIcon className="h-4 w-4" />Edit founder context</button></div>
+            <div className="mb-8 flex flex-col justify-between gap-5 xl:flex-row xl:items-end"><div><p className="eyebrow">{activeStage.eyebrow} · Stage {activeStage.id} of {stages.length}</p><h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">Build the company, one <span className="text-indigo-300">validated step</span> at a time.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">FounderOps turns your choices and conversations into a practical path from idea to evidence. No generic business plan. Just the next thing worth learning.</p></div><button onClick={openContextFlow} className="secondary-button shrink-0"><PencilSquareIcon className="h-4 w-4" />Edit founder context</button></div>
 
             <div className="mb-7 flex flex-wrap gap-2">{Object.entries(context).map(([key, value]) => <span key={key} className="context-chip"><span className="text-slate-500">{key}</span>{value}</span>)}</div>
 
@@ -144,7 +205,7 @@ export default function FounderOpsWorkspace() {
         </section>
       </div>
 
-      {showContext && <div className="modal-backdrop" onClick={() => setShowContext(false)}><div className="context-modal" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><p className="eyebrow">Personalize your build path</p><h3 className="mt-2 text-xl font-semibold">Tell FounderOps where you are starting.</h3><p className="mt-2 text-sm leading-6 text-slate-400">These choices change the examples, risks, and next actions you see.</p></div><button className="icon-button" onClick={() => setShowContext(false)}><XMarkIcon className="h-5 w-5" /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{Object.entries(context).map(([key, value]) => <label key={key} className="field-label"><span>{key}</span><input value={value} onChange={(event) => setContext((current) => ({ ...current, [key]: event.target.value }))} className="field-input" /></label>)}</div><div className="mt-6 flex justify-end gap-2"><button onClick={() => setShowContext(false)} className="secondary-button">Cancel</button><button onClick={() => setShowContext(false)} className="primary-button">Save context <CheckCircleIcon className="h-4 w-4" /></button></div></div></div>}
+      {showContext && <div className="modal-backdrop" onClick={() => setShowContext(false)}><div className="context-modal selection-modal" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><p className="eyebrow">Personalize your build path · Step {(['industry', 'segment', 'audience'] as SelectionStep[]).indexOf(selectionStep) + 1} of 3</p><h3 className="mt-2 text-2xl font-semibold tracking-tight">{selectionMeta[selectionStep].title}</h3><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">{selectionMeta[selectionStep].description}</p></div><button className="icon-button" onClick={() => setShowContext(false)}><XMarkIcon className="h-5 w-5" /></button></div><div className="selection-progress"><span className="selection-progress-active" style={{ width: `${((['industry', 'segment', 'audience'] as SelectionStep[]).indexOf(selectionStep) + 1) / 3 * 100}%` }} /></div><div className="selection-stepper">{(['industry', 'segment', 'audience'] as SelectionStep[]).map((step, index) => <button key={step} onClick={() => setSelectionStep(step)} className={`selection-step ${selectionStep === step ? 'selection-step-active' : ''}`}><span>{index + 1}</span>{step}</button>)}</div><div className="selection-grid">{selectionOptions[selectionStep].map((option) => <button key={option.id} onClick={() => chooseSelection(selectionStep, option.id)} className={`selection-option ${selectionValues[selectionStep] === option.id ? 'selection-option-selected' : ''}`}><span className="selection-option-icon">{option.icon}</span><span className="selection-option-copy"><strong>{option.label}</strong><small>{option.description}</small></span><span className="selection-radio">{selectionValues[selectionStep] === option.id ? '✓' : ''}</span></button>)}</div><div className="selection-footer"><span className="text-xs text-slate-500">{selectionValues[selectionStep] ? `Selected: ${selectionOptions[selectionStep].find((option) => option.id === selectionValues[selectionStep])?.label}` : 'Choose one to continue'}</span><div className="flex gap-2"><button onClick={() => setShowContext(false)} className="secondary-button">Cancel</button><button onClick={continueSelection} disabled={!selectionValues[selectionStep]} className="primary-button">{selectionMeta[selectionStep].next ? 'Continue' : 'Use this focus'} <ArrowRightIcon className="h-4 w-4" /></button></div></div></div></div>}
     </main>
   );
 }
