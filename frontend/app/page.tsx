@@ -85,6 +85,25 @@ const navItems = [
   { label: 'Evidence', icon: UserGroupIcon }
 ];
 
+type ValueProp = { job: string; pain: string; outcome: string; offering: string; proof: string };
+
+type ValuePropProps = { context: { industry: string; segment: string; audience: string; location: string; model: string; hours: string }; valueProp: ValueProp; setValueProp: (value: ValueProp) => void; onSave: () => void };
+
+function ValuePropositionPanel({ context, valueProp, setValueProp, onSave }: ValuePropProps) {
+  const update = (key: keyof ValueProp, value: string) => setValueProp({ ...valueProp, [key]: value });
+  const statement = valueProp.job && valueProp.outcome
+    ? `For ${context.audience.toLowerCase()} in ${context.segment.toLowerCase()}, ${context.industry.toLowerCase()} ${valueProp.offering ? `offering ${valueProp.offering.toLowerCase()} ` : ''}helps them ${valueProp.outcome.toLowerCase()}${valueProp.pain ? ` when they are facing ${valueProp.pain.toLowerCase()}` : ''}.`
+    : 'Complete the job and outcome fields to generate your first value proposition draft.';
+  const fields: Array<{ key: keyof ValueProp; label: string; prompt: string; placeholder: string }> = [
+    { key: 'job', label: 'Customer job', prompt: 'What are they trying to get done?', placeholder: `Example: help ${context.audience.toLowerCase()} keep their operation running smoothly...` },
+    { key: 'pain', label: 'Pain or trigger', prompt: 'What makes the current way costly, slow, or frustrating?', placeholder: 'Example: missed follow-ups create revenue leakage and make the team feel reactive...' },
+    { key: 'outcome', label: 'Desired outcome', prompt: 'What measurable or felt improvement do they want?', placeholder: 'Example: respond to every request within one business day...' },
+    { key: 'offering', label: 'Core offering', prompt: 'What is the smallest thing you can provide to create that outcome?', placeholder: 'Example: an AI inbox that prioritizes requests and drafts next actions...' },
+    { key: 'proof', label: 'Proof signal', prompt: 'What would convince you this promise is worth pursuing?', placeholder: 'Example: 5 interviews, 3 design partners, or 2 customers willing to pay...' }
+  ];
+  return <section className="value-prop-panel"><div className="value-prop-heading"><div><p className="eyebrow">Position · Stage 4</p><h3>Define the promise before you build the product.</h3><p>Use your market focus to make a specific promise to a specific person. This is a testable hypothesis, not a tagline.</p></div><span className="value-prop-badge">{Object.values(valueProp).filter(Boolean).length}/5 inputs</span></div><div className="value-prop-context"><span>Built for</span><strong>{context.audience}</strong><span>in</span><strong>{context.segment}</strong><span>·</span><strong>{context.industry}</strong></div><div className="value-prop-fields">{fields.map((field) => <label key={field.key} className="value-prop-field"><span className="value-prop-label">{field.label}</span><span className="value-prop-prompt">{field.prompt}</span><textarea value={valueProp[field.key]} onChange={(event) => update(field.key, event.target.value)} placeholder={field.placeholder} /></label>)}</div><div className="value-prop-output"><div><p className="eyebrow">Generated working draft</p><h4>Your value proposition</h4><p>{statement}</p></div><button onClick={onSave} className="primary-button">Save proposition <CheckCircleIcon className="h-4 w-4" /></button></div></section>;
+}
+
 export default function FounderOpsWorkspace() {
   const [activeNav, setActiveNav] = useState('Build path');
   const [stages, setStages] = useState(initialStages);
@@ -95,6 +114,7 @@ export default function FounderOpsWorkspace() {
   const [selectionStep, setSelectionStep] = useState<SelectionStep>('industry');
   const [selectionValues, setSelectionValues] = useState<Record<SelectionStep, string>>({ industry: '', segment: '', audience: '' });
   const [canUseSpeech, setCanUseSpeech] = useState(false);
+  const [valueProp, setValueProp] = useState<ValueProp>({ job: '', pain: '', outcome: '', offering: '', proof: '' });
   const [context, setContext] = useState({ industry: 'Health & wellness', segment: 'Independent clinics', audience: 'Clinic owners', location: 'Ontario, Canada', model: 'B2B SaaS', hours: '8 hours / week' });
 
   const activeStage = stages.find((stage) => stage.id === activeStageId) ?? stages[0];
@@ -116,6 +136,11 @@ export default function FounderOpsWorkspace() {
   function selectStage(stage: Stage) {
     setActiveStageId(stage.id);
     setAnswer(stage.id === 1 ? 'I have spent the last five years working with independent clinics and have seen how much time is lost to preventable no-shows.' : '');
+  }
+
+  function saveValueProposition() {
+    setStages((current) => current.map((stage) => stage.id === 4 ? { ...stage, status: 'complete', evidence: 'Value proposition drafted' } : stage));
+    setActiveStageId(5);
   }
 
   function saveAnswer() {
@@ -194,6 +219,7 @@ export default function FounderOpsWorkspace() {
 
             <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
               <div className="space-y-5">
+                {activeStage.id === 4 && <ValuePropositionPanel context={context} valueProp={valueProp} setValueProp={setValueProp} onSave={saveValueProposition} />}
                 <section className="primary-card"><div className="flex items-start justify-between gap-4"><div><div className="mb-3 flex items-center gap-2"><span className="mini-icon"><UserGroupIcon className="h-4 w-4" /></span><span className="eyebrow">{statusLabel}</span></div><h3 className="text-xl font-semibold tracking-tight">{activeStage.name}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{activeStage.description}</p></div><span className={`rounded-full border px-3 py-1 text-xs ${activeStage.status === 'complete' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-indigo-400/20 bg-indigo-400/10 text-indigo-200'}`}>{activeStage.status === 'complete' ? 'Saved' : 'In focus'}</span></div><div className="question-block"><div className="mb-3 flex items-start gap-3"><SparklesIcon className="mt-1 h-5 w-5 shrink-0 text-indigo-300" /><p className="text-lg font-medium leading-7 text-slate-100">{activeStage.prompt}</p></div><p className="ml-8 text-sm leading-6 text-slate-400">{activeStage.helper}</p></div><div className="relative mt-5"><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder={activeStage.placeholder} className="answer-input" /><div className="absolute bottom-3 left-3 flex items-center gap-2"><button onClick={startListening} disabled={!canUseSpeech || isListening} className={`voice-button ${isListening ? 'voice-button-live' : ''}`}><MicrophoneIcon className="h-4 w-4" />{isListening ? 'Listening…' : canUseSpeech ? 'Speak your answer' : 'Voice unavailable'}</button><span className="text-[11px] text-slate-600">Your words become an editable answer</span></div><span className="absolute bottom-4 right-4 text-[11px] text-slate-600">{answer.length} chars</span></div><div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-2 text-xs text-slate-500"><DocumentTextIcon className="h-4 w-4" />Creates: <span className="text-slate-300">{activeStage.artifact}</span></div><div className="flex items-center gap-2"><button onClick={saveAnswer} className="secondary-button">Save evidence</button><button onClick={advanceStage} className="primary-button">Save & continue <ArrowRightIcon className="h-4 w-4" /></button></div></div></section>
 
                 <section className="surface-card"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow">Artifacts from your thinking</p><h3 className="mt-1 text-base font-semibold">Your startup workspace</h3></div><button className="text-xs font-medium text-indigo-300 hover:text-indigo-200"><PlusIcon className="mr-1 inline h-4 w-4" />Add artifact</button></div><div className="grid gap-3 sm:grid-cols-2">{['Founder thesis', 'Problem brief', 'Interview log', 'MVP experiment'].map((artifact, index) => <button key={artifact} className="artifact-card"><div className="flex items-center justify-between"><DocumentTextIcon className="h-5 w-5 text-slate-500" /><span className={`text-[11px] ${index < 1 ? 'text-emerald-300' : 'text-slate-500'}`}>{index < 1 ? 'Ready' : 'Draft'}</span></div><p className="mt-4 text-sm font-semibold text-slate-200">{artifact}</p><p className="mt-1 text-xs text-slate-500">{index < 1 ? 'Evidence linked' : 'Build as you progress'}</p></button>)}</div></section>
