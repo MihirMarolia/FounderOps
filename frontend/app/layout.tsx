@@ -5,8 +5,8 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'FounderOps Assistant — Project Dashboard',
-  description: 'MVP dashboard with AI insights and scheduling.'
+  title: 'FounderOps — Startup Workspace',
+  description: 'A guided operating system for first-time founders to build, validate, and manage a startup.'
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

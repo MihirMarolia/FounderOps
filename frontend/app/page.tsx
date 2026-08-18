@@ -1,62 +1,150 @@
 'use client';
 
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { DailyPlanItem } from '../types';
-import { useProjects } from '../hooks/useProjects';
-import { ProjectList } from '../components/ProjectList';
-import { ProjectOverview } from '../components/ProjectOverview';
-import { TaskList } from '../components/TaskList';
-import { DailyPlanPanel } from '../components/DailyPlanPanel';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  Bars3Icon,
+  BoltIcon,
+  CheckCircleIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  FlagIcon,
+  MicrophoneIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  SparklesIcon,
+  UserGroupIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 
-const samplePlan: DailyPlanItem[] = [
-  { taskId: 't2', start: '09:00', end: '09:50', label: 'Research filings' },
-  { taskId: 't3', start: '10:00', end: '11:20', label: 'Spec MVP' },
-  { taskId: 't1', start: '14:00', end: '14:45', label: 'Polish problem statement' },
-  { taskId: 't2', start: '15:00', end: '15:50', label: 'Filings review' }
+type Stage = {
+  id: number;
+  name: string;
+  eyebrow: string;
+  status: 'complete' | 'current' | 'upcoming';
+  description: string;
+  prompt: string;
+  helper: string;
+  placeholder: string;
+  artifact: string;
+  evidence: string;
+};
+
+const initialStages: Stage[] = [
+  { id: 1, name: 'Founder context', eyebrow: 'Start here', status: 'complete', description: 'Set the direction for your company and the constraints you are working within.', prompt: 'What are you trying to change, and why are you the person to build it?', helper: 'A clear founder thesis keeps the build grounded in a real advantage, insight, or lived experience.', placeholder: 'Example: I want to help independent clinics reduce no-shows because I have seen how much revenue and care gets lost...', artifact: 'Founder thesis', evidence: 'Founder insight recorded' },
+  { id: 2, name: 'Customer & market', eyebrow: 'Focus', status: 'current', description: 'Choose a narrow first customer and market before you try to serve everyone.', prompt: 'Who is the first group of people you want to serve, where are they, and what are they already doing today?', helper: 'Start with a beachhead: a specific audience, location, segment, or community where the problem is urgent and reachable.', placeholder: 'Example: Independent dental practices with 2–10 chairs in Ontario that lose revenue from last-minute cancellations...', artifact: 'Beachhead market brief', evidence: '0 customer interviews' },
+  { id: 3, name: 'Problem discovery', eyebrow: 'Learn', status: 'upcoming', description: 'Turn assumptions into questions and collect evidence from real people.', prompt: 'What problem do you believe this customer has, and what would you need to observe or hear to prove it?', helper: 'Avoid pitching the solution. Capture the current workflow, trigger, workaround, cost, and emotional impact.', placeholder: 'Write the problem hypothesis and the interview questions you will use...', artifact: 'Problem brief + interview script', evidence: '0 validated observations' },
+  { id: 4, name: 'Value proposition', eyebrow: 'Position', status: 'upcoming', description: 'Describe the smallest valuable outcome your product can create.', prompt: 'What is the simplest promise you can make to this customer that is meaningfully better than their current alternative?', helper: 'Your first promise should be specific enough to test and narrow enough to deliver manually if needed.', placeholder: 'For [customer], who struggles with [problem], we help them achieve [outcome] by [mechanism]...', artifact: 'Value proposition canvas', evidence: 'No promise tested' },
+  { id: 5, name: 'MVP experiment', eyebrow: 'Build', status: 'upcoming', description: 'Design the fastest credible test of your riskiest assumption.', prompt: 'What can you put in front of a real customer this week to learn whether the problem and promise are real?', helper: 'Prefer a concierge, prototype, landing page, or manual service before building a full product.', placeholder: 'Define the experiment, who will participate, what they will do, and what result counts as a signal...', artifact: 'Experiment card', evidence: 'No active experiment' },
+  { id: 6, name: 'First customers', eyebrow: 'Launch', status: 'upcoming', description: 'Create a practical path to your first 10 customers or design partners.', prompt: 'How will you reach the first people who feel this problem most intensely?', helper: 'Early distribution is often personal and manual. Choose a channel you can operate yourself.', placeholder: 'List your first 20 prospects, communities, partners, or channels...', artifact: 'First-customer plan', evidence: '0 prospects contacted' },
+  { id: 7, name: 'Business model', eyebrow: 'Sustain', status: 'upcoming', description: 'Make the economics and pricing assumptions explicit.', prompt: 'Who pays, for what outcome, how often, and what would make the economics sustainable?', helper: 'Pricing is a hypothesis. Tie it to value, willingness to pay, and the cost of serving the customer.', placeholder: 'Describe the buyer, pricing hypothesis, expected costs, and the first monetization test...', artifact: 'Business model snapshot', evidence: 'Pricing not tested' },
+  { id: 8, name: 'Operating cadence', eyebrow: 'Keep moving', status: 'upcoming', description: 'Turn learning into a weekly rhythm of focus, evidence, and decisions.', prompt: 'What is the one outcome that would make this week meaningfully successful?', helper: 'FounderOps keeps you focused on one key metric, a short list of actions, and a weekly pivot-or-persevere decision.', placeholder: 'Define this week’s outcome, metric, customer conversations, and build block...', artifact: 'Weekly operating plan', evidence: 'Cadence not started' }
 ];
 
-export default function DashboardPage() {
-  const { projects, activeProject, tasks, selectedProjectId, setSelectedProjectId } = useProjects();
+const navItems = [
+  { label: 'Today', icon: BoltIcon },
+  { label: 'Build path', icon: FlagIcon },
+  { label: 'Workspace', icon: DocumentTextIcon },
+  { label: 'Evidence', icon: UserGroupIcon }
+];
+
+export default function FounderOpsWorkspace() {
+  const [activeNav, setActiveNav] = useState('Build path');
+  const [stages, setStages] = useState(initialStages);
+  const [activeStageId, setActiveStageId] = useState(2);
+  const [answer, setAnswer] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [showContext, setShowContext] = useState(false);
+  const [canUseSpeech, setCanUseSpeech] = useState(false);
+  const [context, setContext] = useState({ industry: 'Health & wellness', segment: 'Independent clinics', audience: 'Clinic owners', location: 'Ontario, Canada', model: 'B2B SaaS', hours: '8 hours / week' });
+
+  const activeStage = stages.find((stage) => stage.id === activeStageId) ?? stages[0];
+  const completedCount = stages.filter((stage) => stage.status === 'complete').length;
+  const completion = Math.round((completedCount / stages.length) * 100);
+
+  const stageIndex = stages.findIndex((stage) => stage.id === activeStageId);
+  const nextStage = stages[stageIndex + 1];
+  useEffect(() => {
+    setCanUseSpeech('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  }, []);
+
+  const statusLabel = useMemo(() => {
+    if (activeStage.status === 'complete') return 'Evidence captured';
+    if (activeStage.status === 'current') return 'Your next decision';
+    return 'Up next';
+  }, [activeStage.status]);
+
+  function selectStage(stage: Stage) {
+    setActiveStageId(stage.id);
+    setAnswer(stage.id === 1 ? 'I have spent the last five years working with independent clinics and have seen how much time is lost to preventable no-shows.' : '');
+  }
+
+  function saveAnswer() {
+    if (!answer.trim()) return;
+    setStages((current) => current.map((stage) => stage.id === activeStage.id ? { ...stage, status: 'complete', evidence: stage.id === 2 ? 'Market focus recorded' : 'Evidence captured' } : stage));
+  }
+
+  function advanceStage() {
+    saveAnswer();
+    if (nextStage) {
+      setActiveStageId(nextStage.id);
+      setAnswer('');
+      setStages((current) => current.map((stage) => stage.id === nextStage.id ? { ...stage, status: 'current' } : stage.status === 'current' ? { ...stage, status: 'complete' } : stage));
+    }
+  }
+
+  function startListening() {
+    if (!canUseSpeech) return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognition.onresult = (event: any) => setAnswer((current) => `${current}${current ? ' ' : ''}${event.results[0][0].transcript}`);
+    recognition.start();
+  }
 
   return (
-    <main className="max-w-6xl mx-auto py-10 px-6 space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="section-title">FounderOps Assistant</p>
-          <h1 className="text-2xl font-bold">Project Dashboard</h1>
-          <p className="text-sm text-muted">AI-ranked tasks, progress, and market-aware priorities.</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center bg-white/5 rounded-lg px-3 py-2 border border-white/10 w-72">
-            <MagnifyingGlassIcon className="h-5 w-5 text-muted" />
-            <input
-              className="bg-transparent border-none focus:outline-none text-sm ml-2 flex-1"
-              placeholder="Search tasks, milestones"
-            />
+    <main className="min-h-screen bg-[#090d18] text-white">
+      <div className="mx-auto flex min-h-screen max-w-[1500px]">
+        <aside className="hidden w-[252px] shrink-0 border-r border-white/[0.07] bg-[#0c1220] px-5 py-6 lg:flex lg:flex-col">
+          <div className="mb-10 flex items-center gap-3 px-2">
+            <div className="brand-mark"><SparklesIcon className="h-4 w-4" /></div>
+            <div><p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">FounderOps</p><p className="text-sm font-semibold text-white">Startup workspace</p></div>
           </div>
-          <button className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-indigo-500">Sync Calendar</button>
-        </div>
-      </header>
+          <nav className="space-y-1">
+            {navItems.map(({ label, icon: Icon }) => <button key={label} onClick={() => setActiveNav(label)} className={`nav-item ${activeNav === label ? 'nav-item-active' : ''}`}><Icon className="h-[17px] w-[17px]" />{label}{label === 'Today' && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" />}</button>)}
+          </nav>
+          <div className="mt-8 border-t border-white/[0.07] pt-6"><p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Your build path</p><div className="mt-4 space-y-1">{stages.map((stage) => <button key={stage.id} onClick={() => selectStage(stage)} className={`stage-nav ${stage.id === activeStage.id ? 'stage-nav-active' : ''}`}><span className={`stage-dot ${stage.status}`} /> <span className="truncate">{stage.name}</span>{stage.status === 'complete' && <CheckCircleIcon className="ml-auto h-4 w-4 text-emerald-400" />}</button>)}</div></div>
+          <div className="mt-auto rounded-2xl border border-indigo-400/20 bg-indigo-500/[0.08] p-4"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-medium text-indigo-200">Build progress</span><span className="text-sm font-semibold">{completion}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-indigo-400 transition-all" style={{ width: `${completion}%` }} /></div><p className="mt-3 text-xs leading-5 text-slate-400">Progress follows evidence, not paperwork.</p></div>
+        </aside>
 
-      <div className="grid grid-cols-dashboard gap-4">
-        <ProjectList
-          projects={projects}
-          selectedProjectId={selectedProjectId}
-          onSelect={setSelectedProjectId}
-        />
+        <section className="min-w-0 flex-1">
+          <header className="flex h-[74px] items-center justify-between border-b border-white/[0.07] px-5 sm:px-8"><div className="flex items-center gap-3"><button className="icon-button lg:hidden"><Bars3Icon className="h-5 w-5" /></button><div><p className="text-xs font-medium text-slate-500">Workspace / {activeNav}</p><h1 className="text-base font-semibold tracking-tight">MediFlow — from insight to first customers</h1></div></div><div className="flex items-center gap-3"><button onClick={() => setShowContext(true)} className="context-pill"><span className="status-pulse" />{context.industry}<span className="hidden text-slate-500 sm:inline">·</span><span className="hidden sm:inline">{context.location}</span><PencilSquareIcon className="h-3.5 w-3.5 text-slate-500" /></button><div className="avatar">AM</div></div></header>
 
-        <div className="space-y-4">
-          <ProjectOverview project={activeProject} />
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <TaskList tasks={tasks} />
-            </div>
-            <div>
-              <DailyPlanPanel tasks={tasks} plan={samplePlan} />
+          <div className="mx-auto max-w-[1180px] px-5 py-8 sm:px-8">
+            <div className="mb-8 flex flex-col justify-between gap-5 xl:flex-row xl:items-end"><div><p className="eyebrow">{activeStage.eyebrow} · Stage {activeStage.id} of {stages.length}</p><h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">Build the company, one <span className="text-indigo-300">validated step</span> at a time.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">FounderOps turns your choices and conversations into a practical path from idea to evidence. No generic business plan. Just the next thing worth learning.</p></div><button onClick={() => setShowContext(true)} className="secondary-button shrink-0"><PencilSquareIcon className="h-4 w-4" />Edit founder context</button></div>
+
+            <div className="mb-7 flex flex-wrap gap-2">{Object.entries(context).map(([key, value]) => <span key={key} className="context-chip"><span className="text-slate-500">{key}</span>{value}</span>)}</div>
+
+            <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+              <div className="space-y-5">
+                <section className="primary-card"><div className="flex items-start justify-between gap-4"><div><div className="mb-3 flex items-center gap-2"><span className="mini-icon"><UserGroupIcon className="h-4 w-4" /></span><span className="eyebrow">{statusLabel}</span></div><h3 className="text-xl font-semibold tracking-tight">{activeStage.name}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{activeStage.description}</p></div><span className={`rounded-full border px-3 py-1 text-xs ${activeStage.status === 'complete' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-indigo-400/20 bg-indigo-400/10 text-indigo-200'}`}>{activeStage.status === 'complete' ? 'Saved' : 'In focus'}</span></div><div className="question-block"><div className="mb-3 flex items-start gap-3"><SparklesIcon className="mt-1 h-5 w-5 shrink-0 text-indigo-300" /><p className="text-lg font-medium leading-7 text-slate-100">{activeStage.prompt}</p></div><p className="ml-8 text-sm leading-6 text-slate-400">{activeStage.helper}</p></div><div className="relative mt-5"><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder={activeStage.placeholder} className="answer-input" /><div className="absolute bottom-3 left-3 flex items-center gap-2"><button onClick={startListening} disabled={!canUseSpeech || isListening} className={`voice-button ${isListening ? 'voice-button-live' : ''}`}><MicrophoneIcon className="h-4 w-4" />{isListening ? 'Listening…' : canUseSpeech ? 'Speak your answer' : 'Voice unavailable'}</button><span className="text-[11px] text-slate-600">Your words become an editable answer</span></div><span className="absolute bottom-4 right-4 text-[11px] text-slate-600">{answer.length} chars</span></div><div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-2 text-xs text-slate-500"><DocumentTextIcon className="h-4 w-4" />Creates: <span className="text-slate-300">{activeStage.artifact}</span></div><div className="flex items-center gap-2"><button onClick={saveAnswer} className="secondary-button">Save evidence</button><button onClick={advanceStage} className="primary-button">Save & continue <ArrowRightIcon className="h-4 w-4" /></button></div></div></section>
+
+                <section className="surface-card"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow">Artifacts from your thinking</p><h3 className="mt-1 text-base font-semibold">Your startup workspace</h3></div><button className="text-xs font-medium text-indigo-300 hover:text-indigo-200"><PlusIcon className="mr-1 inline h-4 w-4" />Add artifact</button></div><div className="grid gap-3 sm:grid-cols-2">{['Founder thesis', 'Problem brief', 'Interview log', 'MVP experiment'].map((artifact, index) => <button key={artifact} className="artifact-card"><div className="flex items-center justify-between"><DocumentTextIcon className="h-5 w-5 text-slate-500" /><span className={`text-[11px] ${index < 1 ? 'text-emerald-300' : 'text-slate-500'}`}>{index < 1 ? 'Ready' : 'Draft'}</span></div><p className="mt-4 text-sm font-semibold text-slate-200">{artifact}</p><p className="mt-1 text-xs text-slate-500">{index < 1 ? 'Evidence linked' : 'Build as you progress'}</p></button>)}</div></section>
+              </div>
+
+              <aside className="space-y-5"><section className="focus-card"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow text-amber-300/80">This week</p><h3 className="mt-1 text-lg font-semibold">Your founder focus</h3></div><BoltIcon className="h-5 w-5 text-amber-300" /></div><p className="text-sm leading-6 text-slate-300">Talk to <strong className="text-white">5 clinic owners</strong> and learn whether no-shows are painful enough to change.</p><div className="mt-5 space-y-3"><div className="focus-row"><span className="check-empty" /><span>Draft interview script</span><span className="ml-auto text-[11px] text-slate-500">20m</span></div><div className="focus-row"><span className="check-empty" /><span>Book first 2 conversations</span><span className="ml-auto text-[11px] text-slate-500">30m</span></div><div className="focus-row"><span className="check-empty" /><span>Log the strongest signal</span><span className="ml-auto text-[11px] text-slate-500">15m</span></div></div><button className="mt-5 w-full rounded-xl border border-amber-300/20 bg-amber-300/10 py-2.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-300/15">Open weekly plan</button></section><section className="surface-card"><div className="mb-4 flex items-center gap-3"><span className="mini-icon"><UserGroupIcon className="h-4 w-4" /></span><div><p className="eyebrow">Evidence tracker</p><h3 className="mt-1 text-base font-semibold">What you know so far</h3></div></div><div className="space-y-4"><div><div className="mb-1 flex justify-between text-xs"><span className="text-slate-400">Customer conversations</span><span className="text-slate-200">0 / 5</span></div><div className="progress-track"><div className="w-0" /></div></div><div><div className="mb-1 flex justify-between text-xs"><span className="text-slate-400">Assumptions tested</span><span className="text-slate-200">1 / 4</span></div><div className="progress-track"><div className="w-1/4 bg-indigo-400" /></div></div><div><div className="mb-1 flex justify-between text-xs"><span className="text-slate-400">Artifacts ready</span><span className="text-slate-200">1 / 8</span></div><div className="progress-track"><div className="w-[12%] bg-emerald-400" /></div></div></div><button className="mt-5 flex items-center text-xs font-medium text-indigo-300">View all evidence <ChevronRightIcon className="ml-1 h-4 w-4" /></button></section><section className="surface-card"><div className="flex items-start gap-3"><span className="mini-icon"><ClockIcon className="h-4 w-4" /></span><div><p className="eyebrow">Next review</p><h3 className="mt-1 text-sm font-semibold">Friday · Pivot or persevere</h3><p className="mt-2 text-xs leading-5 text-slate-500">FounderOps will help you compare your evidence against the assumption you are testing.</p></div></div></section></aside>
             </div>
           </div>
-        </div>
+        </section>
       </div>
+
+      {showContext && <div className="modal-backdrop" onClick={() => setShowContext(false)}><div className="context-modal" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><p className="eyebrow">Personalize your build path</p><h3 className="mt-2 text-xl font-semibold">Tell FounderOps where you are starting.</h3><p className="mt-2 text-sm leading-6 text-slate-400">These choices change the examples, risks, and next actions you see.</p></div><button className="icon-button" onClick={() => setShowContext(false)}><XMarkIcon className="h-5 w-5" /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{Object.entries(context).map(([key, value]) => <label key={key} className="field-label"><span>{key}</span><input value={value} onChange={(event) => setContext((current) => ({ ...current, [key]: event.target.value }))} className="field-input" /></label>)}</div><div className="mt-6 flex justify-end gap-2"><button onClick={() => setShowContext(false)} className="secondary-button">Cancel</button><button onClick={() => setShowContext(false)} className="primary-button">Save context <CheckCircleIcon className="h-4 w-4" /></button></div></div></div>}
     </main>
   );
 }

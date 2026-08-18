@@ -3,7 +3,7 @@ import useSWR from 'swr';
 import { projects as sampleProjects, tasks as sampleTasks } from '../lib/sampleData';
 import { Project, Task } from '../types';
 
-const fetcher = async (key: string) => {
+const fetcher = async (key: string): Promise<Project[] | Task[]> => {
   if (key === 'projects') {
     return sampleProjects;
   }
@@ -14,8 +14,8 @@ const fetcher = async (key: string) => {
 };
 
 export function useProjects() {
-  const { data: projects = [] } = useSWR<Project[]>('projects', fetcher);
-  const { data: tasks = [] } = useSWR<Task[]>('tasks', fetcher);
+  const { data: projects = [] } = useSWR<Project[]>('projects', (key: string) => fetcher(key) as Promise<Project[]>);
+  const { data: tasks = [] } = useSWR<Task[]>('tasks', (key: string) => fetcher(key) as Promise<Task[]>);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
 
   const activeProject = useMemo(
